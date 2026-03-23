@@ -15,6 +15,7 @@ interface QrCodeResponse {
 interface QrStatusResponse {
   ret: number;
   status: string;
+  retmsg?: string;
   bot_token?: string;
   ilink_bot_id?: string;
   baseurl?: string;
@@ -114,7 +115,20 @@ export async function waitForQrScan(qrcodeId: string): Promise<AccountData> {
       }
 
       default:
-        logger.warn('Unknown QR status', { status: data.status });
+        logger.warn('Unknown QR status', { status: data.status, retmsg: data.retmsg });
+        // Surface error to user for known failure statuses
+        if (data.status && (
+          data.status.includes('not_support') ||
+          data.status.includes('version') ||
+          data.status.includes('forbid') ||
+          data.status.includes('reject') ||
+          data.status.includes('cancel')
+        )) {
+          throw new Error(`二维码扫描失败: ${data.retmsg || data.status}`);
+        }
+        if (data.retmsg) {
+          throw new Error(`二维码扫描失败: ${data.retmsg}`);
+        }
         break;
     }
 

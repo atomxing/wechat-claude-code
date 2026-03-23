@@ -5,6 +5,7 @@ const HELP_TEXT = `可用命令：
 
   /help             显示帮助
   /clear            清除当前会话
+  /cwd <路径>       切换工作目录
   /model <名称>     切换 Claude 模型
   /permission <模式> 切换权限模式
   /status           查看当前会话状态
@@ -40,6 +41,14 @@ export function handleClear(ctx: CommandContext): CommandResult {
   const newSession = ctx.clearSession();
   Object.assign(ctx.session, newSession);
   return { reply: '✅ 会话已清除，下次消息将开始新会话。', handled: true };
+}
+
+export function handleCwd(ctx: CommandContext, args: string): CommandResult {
+  if (!args) {
+    return { reply: `当前工作目录: ${ctx.session.workingDirectory}\n用法: /cwd <路径>`, handled: true };
+  }
+  ctx.updateSession({ workingDirectory: args });
+  return { reply: `✅ 工作目录已切换为: ${args}`, handled: true };
 }
 
 export function handleModel(ctx: CommandContext, args: string): CommandResult {

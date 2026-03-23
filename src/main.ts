@@ -167,6 +167,13 @@ async function runDaemon(): Promise<void> {
   const api = new WeChatApi(account.botToken, account.baseUrl);
   const sessionStore = createSessionStore();
   const session: Session = sessionStore.load(account.accountId);
+
+  // Fix: backfill session workingDirectory from config if it's still the default process.cwd()
+  if (config.workingDirectory && session.workingDirectory === process.cwd()) {
+    session.workingDirectory = config.workingDirectory;
+    sessionStore.save(account.accountId, session);
+  }
+
   const sender = createSender(api, account.accountId);
   const sharedCtx = { lastContextToken: '' };
   const permissionBroker = createPermissionBroker(async () => {

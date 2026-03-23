@@ -1,4 +1,4 @@
-import type { MessageItem } from './types.js';
+import type { MessageItem, ImageItem } from './types.js';
 import { MessageItemType } from './types.js';
 import { downloadAndDecrypt } from './cdn.js';
 import { logger } from '../logger.js';
@@ -13,17 +13,51 @@ function detectMimeType(data: Buffer): string {
 }
 
 /**
+ * Extract AES key and encrypt_query_param from an ImageItem,
+ * supporting both the old cdn_media format and the newer flat format.
+ */
+function getImageCdnData(imageItem: ImageItem): { aesKey: string; encryptQueryParam: string } | null {
+  // Old format: cdn_media.aes_key + cdn_media.encrypt_query_param
+  if (imageItem.cdn_media?.aes_key && imageItem.cdn_media?.encrypt_query_param) {
+    return {
+      aesKey: imageItem.cdn_media.aes_key,
+      encryptQueryParam: imageItem.cdn_media.encrypt_query_param,
+    };
+  }
+
+  // New format: aeskey + media.encrypt_query_param
+  if (imageItem.aeskey && imageItem.media?.encrypt_query_param) {
+    return {
+      aesKey: imageItem.aeskey,
+      encryptQueryParam: imageItem.media.encrypt_query_param,
+    };
+  }
+
+  logger.warn('Image item has no usable CDN data', {
+    hasCdnMedia: !!imageItem.cdn_media,
+    hasAeskey: !!imageItem.aeskey,
+    hasMedia: !!imageItem.media,
+  });
+  return null;
+}
+
+/**
  * Download a CDN image, decrypt it, and return a base64 data URI.
  * Returns null on failure.
  */
 export async function downloadImage(item: MessageItem): Promise<string | null> {
-  const cdnMedia = item.image_item?.cdn_media;
-  if (!cdnMedia) {
+  const imageItem = item.image_item;
+  if (!imageItem) {
+    return null;
+  }
+
+  const cdnData = getImageCdnData(imageItem);
+  if (!cdnData) {
     return null;
   }
 
   try {
-    const decrypted = await downloadAndDecrypt(cdnMedia.encrypt_query_param, cdnMedia.aes_key);
+    const decrypted = await downloadAndDecrypt(cdnData.encryptQueryParam, cdnData.aesKey);
     const mimeType = detectMimeType(decrypted);
     const base64 = decrypted.toString('base64');
     const dataUri = `data:${mimeType};base64,${base64}`;
